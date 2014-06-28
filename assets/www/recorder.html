@@ -1,0 +1,88 @@
+<!DOCTYPE html>  
+<html><head><meta charset="utf-8">
+<script type="text/javascript" src="jsWaffle.js"></script>
+<script>
+window.onload = function() {
+	var save_dir = "/sdcard/GPSRecorder/"; // 保存先ディレクトリ
+	var last_save_hour = -1;               // 最後に保存した時刻
+	var last_recv_time = 0;                // 前回計測した時間
+	var record_interval = 1000 * 30;       // 30秒に1度記録する
+	var geos = [];                         // GPSデータ
+	droid.mkdir(save_dir);
+	loadLogFromFile();
+	// 位置情報の監視をはじめる
+	droid.watchPosition(locationHandler);
+	// GPS情報を受信したときの処理
+	function locationHandler(position){
+		// 頻繁に記録しないようにする
+		var now = new Date(); // 現在時刻
+		if (now.getTime() - last_recv_time < record_interval) return;
+		last_recv_time = now.getTime();
+		// 位置情報をオブジェクトから値を取り出す
+		var lat = position.coords.latitude;  // 緯度
+		var lon = position.coords.longitude; // 経度
+		var acc = position.coords.accuracy;  // 精度(m)
+		// 一時間ごとに情報をファイルへ保存する
+		if (last_save_hour < 0) last_save_hour = now.getHours();
+		if (now.getHours() != last_save_hour) {
+			saveLogToFile(); // 保存
+			geos = [];    //初期化
+			last_save_hour = now.getHours();
+		}
+		// 位置情報を配列変数geosに記録
+		geos.push([now.getTime(), lat, lon, acc]);
+		showLog(); // 画面を更新
+	}
+	// 画面を更新
+	function showLog() {
+		var s = "";
+		for (var i in geos) {
+			var a = geos[i];
+			var time_i = a[0], lat = a[1], lon = a[2], acc = a[3];
+			var t = new Date(); t.setTime(time_i);
+			var url = "geo:" + lat + "," + lon + "," + acc;
+			var time_s = keta(t.getHours()) + ":" + keta(t.getMinutes()) +
+				":" + keta(t.getSeconds());
+			s += "[" + time_s + "] <a href='" + url + "'>" + url + "</a>";
+		}
+		$("info").innerHTML = s;
+	}
+	// 数字の桁を二桁に揃える
+	function keta(num) {
+		var s = "00" + num;
+		return s.substr(s.length - 2, 2);
+	}
+	// 時刻に応じたログファイル名を生成する
+	function getLogFileName(time_i) {
+		var t = new Date();
+		t.setTime(time_i); // 保存時の時刻を得る
+		return save_dir + keta(t.getMonth()) + "-" + 
+			keta(t.getDate()) + "_" + keta(t.getHours()) + ".json";
+	}
+	// 現在保持しているデータをファイルへ待避する
+	function saveLogToFile() {
+		var json = droid.stringify(geos); // JSON形式に変換
+		droid.saveText(getLogFileName(geos[0][0]), json); // ファイルへ保存
+		droid.log("save:" + getLogFileName());
+	}
+	// 前回の続きのログがあれば引き継ぐ
+	function loadLogFromFile() {
+		var fname = getLogFileName(new Date().getTime());
+		if (droid.fileExists(fname)) {
+			var json = droid.loadText(fname);
+			geos = eval("(" + json + ")");
+			showLog();
+		}
+	}
+	// アプリが終了(またはスリープ)する直前にデータをファイルへ保存
+	droid.addEventListener("pause", saveLogToFile);
+	// アプリ起動時(またはスリープからの復帰のとき)にデータを読み込む
+	droid.addEventListener("resume", loadLogFromFile);
+};
+</script>
+</head>
+<body>
+	<h1>GPS LOG:</h1>
+	<div id="info"></div>
+</body>
+</html>

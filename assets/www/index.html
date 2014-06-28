@@ -1,0 +1,53 @@
+<!DOCTYPE html>  
+<html><head>
+<meta charset="utf-8">
+<script type="text/javascript" src="jsWaffle.js"></script>
+<script type="text/javascript" src="http://maps.google.com/maps/api/js?sensor=true&language=ja"></script>
+<script type="text/javascript">
+window.onload = function () {
+    // マップ(map_canvas)を画面全体に表示する
+    var disp = droid.getDisplayInfo();
+    $("map_canvas").style.width  = disp["width"] + "px";
+    $("map_canvas").style.height = disp["height"] + "px";
+    // Googleマップを初期化する
+    var latlng = new google.maps.LatLng(35.662178,139.745407);
+    var mapOptions = {
+        zoom:12, 
+        center:latlng, 
+        mapTypeId: google.maps.MapTypeId.ROADMAP
+    };
+    var gmap = new google.maps.Map($("map_canvas"), mapOptions);
+    // ラインマーカーを地図上に表示する
+    var linepath = [];
+    var line = new google.maps.Polyline({
+        map: gmap, path: linepath, strokeColor: "#ff0000",  
+        strokeWeight: 3, strokeOpacity: 0.7
+    });
+    // 位置情報を定期的にチェックする
+    var posOptions = {
+        enableHighAccuracy: true,
+        timeout: 1000 * 10,
+        maximumAge: 1000 * 3
+    };
+    droid.watchPosition(positionHandler, errorHandler, posOptions);
+    function positionHandler(position) {
+        var lat = position.coords.latitude;
+        var lon = position.coords.longitude;
+        var acc = position.coords.accuracy;
+        // 現在位置まで線を引く
+        var latlng = new google.maps.LatLng(lat, lon);
+        gmap.panTo(latlng);
+        linepath.push(latlng);
+        line.setPath(linepath);
+    }
+    function errorHandler(errorObj) {
+        droid.log(errorObj.message);
+    }
+};
+</script>
+<style>
+    * { margin:0; padding:0; }
+</style>
+</head><body>
+    <div id="map_canvas"></div>
+</body></html>
